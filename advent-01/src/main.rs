@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fs;
-use std::collections;
 
 fn main() {
     println!("Starting");

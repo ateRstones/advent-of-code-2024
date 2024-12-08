@@ -11,6 +11,7 @@ fn check_job(rules: &Vec<(i32, i32)>, job: &Vec<i32>) -> i32 {
             let i_after = page_indices.get(after).unwrap();
 
             if i_before > i_after {
+                println!("Breaking rule {before}|{after}");
                 return 0;
             }
         }
@@ -20,21 +21,54 @@ fn check_job(rules: &Vec<(i32, i32)>, job: &Vec<i32>) -> i32 {
 }
 
 fn order_job(rules: &Vec<(i32, i32)>, job: &Vec<i32>) -> Vec<i32> {
-    let mut ordered_job = job.clone();
+    let mut ordered_job: Vec<i32> = Vec::new();
 
     let mut relevant_rules: Vec<&(i32, i32)> = rules.iter().filter(|(b,a)| job.contains(a) && job.contains(b)).collect();
 
-    let mut rules_graph_forward: HashMap<i32, Vec<i32>> = relevant_rules.iter().map(|t| **t).collect();
-    let mut rules_graph_backward: HashMap<i32, Vec<i32>> = relevant_rules.iter().map(|t| **t).map(|(a,b)| (b,a)).collect();
+    let mut rules_graph_forward: HashMap<i32, Vec<i32>> = HashMap::new();
+    let mut rules_graph_backward: HashMap<i32, Vec<i32>> = HashMap::new();
+    relevant_rules.iter().map(|t| **t).for_each(|(a,b)| {
+        if !rules_graph_forward.contains_key(&a) {
+            rules_graph_forward.insert(a, Vec::new());
+        }
 
-    // TODO traverse rules. respect multi connections
+        rules_graph_forward.get_mut(&a).unwrap().push(b);
+
+        if !rules_graph_backward.contains_key(&b) {
+            rules_graph_backward.insert(b, Vec::new());
+        }
+
+        rules_graph_backward.get_mut(&b).unwrap().push(a);
+    });
+
     while rules_graph_backward.len() > 0 {
-        let mut current_rule: (&i32, &i32) = rules_graph_backward.iter().next().unwrap();
+        let mut current_rule: (&i32, &Vec<i32>) = rules_graph_backward.iter().next().unwrap();
 
-        while rules_graph_backward.contains_key(current_rule[1]) {
-            current_rule = rules_graph_backward.get(current_rule[1]);
+        while rules_graph_backward.contains_key(&current_rule.1[0]) {
+            current_rule = (&current_rule.1[0], rules_graph_backward.get(&current_rule.1[0]).unwrap());
+        }
+
+        println!("Found rule {:?}", current_rule);
+
+        let current_top_elem = current_rule.1[0];
+        ordered_job.push(current_top_elem);
+
+        let forward_rule = rules_graph_forward.get(&current_top_elem).unwrap();
+        
+        println!("Found forward rule {:?}", forward_rule);
+
+        for target in forward_rule {
+            let mut backward_rule = rules_graph_backward.get_mut(&target).unwrap();
+            if let Some(index) = backward_rule.iter().position(|value| *value == current_top_elem) {
+                backward_rule.swap_remove(index);
+            }
+            if backward_rule.len() == 0 {
+                rules_graph_backward.remove(&target);
+            }
         }
     }
+
+    println!("{:?}", ordered_job);
 
     return ordered_job;
 }
@@ -55,10 +89,14 @@ fn run_for_input(contents: &String) {
 
     let score: i32 = jobs.iter().map(|j| check_job(&rules, &j)).sum();
 
-    println!("Score {score}");
 
     let unordered: Vec<&Vec<i32>> = jobs.iter().filter(|j| check_job(&rules, &j) == 0).collect();
     let ordered: Vec<Vec<i32>> = unordered.iter().map(|j| order_job(&rules, j)).collect();
+
+    let ordered_score: i32 = ordered.iter().map(|j| check_job(&rules, &j)).sum();
+
+    println!("Score {score}");
+    println!("Ordered Score {ordered_score}");
 }
 
 fn main() {
